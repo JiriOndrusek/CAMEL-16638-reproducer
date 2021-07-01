@@ -1,0 +1,5 @@
+/common/target/
+/second/target/
+/first/target/
+*.iml
+.idea

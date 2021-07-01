@@ -1,0 +1,82 @@
+# CAMEL-16638-reproducer
+
+Reproducer for https://issues.apache.org/jira/browse/CAMEL-16638
+
+== What is doing
+
+* Module `first` starts a route with a `LevelDBAggregationRepository`, which aggregates 10 messages.
+Level db file is located in `common/target/leveldb.dat`. Timer sends 5 messages ("first-1",  ..,  "first-5")
+then stops.
+* Module second starts the same route which aggregates 10 messages from the same LevelDb file. Timer
+sends 5 messages ("second-1",  ..,  "second-5") then stops.
+
+== How to execute
+
+(Following commands should be executed from project's root directory)
+
+* Build whole project via
+
+[source]
+mvn clean install
+
+* Run `first` module via
+
+[source]
+mvn spring-boot:run -f first
+
+* Run `second` module via
+
+[source]
+mvn spring-boot:run -f second
+
+== Results
+
+Logging for leeldb component is set to level `DEBUG`.
+
+* When `first` module finishes, there should be no message in output (because aggregation is set to 10
+and module sends 5 messages). But you can see in log:
+
+```
+2021-07-01 13:43:15.509 DEBUG 34592 --- [           main] o.a.c.c.l.LevelDBAggregationRepository   : Size of repository [test] -> 0
+2021-07-01 13:43:15.510 DEBUG 34592 --- [           main] o.a.c.c.l.LevelDBAggregationRepository   : Size of repository [test-completed] -> 0
+2021-07-01 13:43:15.510  INFO 34592 --- [           main] o.a.c.c.l.LevelDBAggregationRepository   : On startup there are no existing aggregate exchanges (not completed) in repository: test
+```
+
+and
+
+```
+2021-07-01 13:43:16.527 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> null
+2021-07-01 13:43:16.528 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[]
+2021-07-01 13:43:16.577 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.578 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.622 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.622 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.673 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.673 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.723 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+2021-07-01 13:43:16.723 DEBUG 34592 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[CE3D2F37A2B374E-0000000000000001]
+```
+
+* When 'second' module finishes, you should see an output message *first-1,first-2,first-3,first-4,first-5,second-1,second-2,second-3,second-4,second-5*
+(aggregated result from both modules). In log there should be
+
+```
+2021-07-01 13:49:18.191 DEBUG 35136 --- [           main] o.a.camel.component.leveldb.LevelDBFile  : Using org.fusesource.leveldbjni.JniDBFactory implementation of org.iq80.leveldb.DBFactory
+2021-07-01 13:49:18.213 DEBUG 35136 --- [           main] o.a.c.c.l.LevelDBAggregationRepository   : Size of repository [test] -> 1
+2021-07-01 13:49:18.213 DEBUG 35136 --- [           main] o.a.c.c.l.LevelDBAggregationRepository   : Size of repository [test-completed] -> 0
+```
+
+and
+
+```
+2021-07-01 13:49:19.246 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.246 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.275 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.275 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.325 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.325 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.376 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.377 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Adding key [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.425 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Getting key  [test] -> Exchange[9B4063F00E1CECF-0000000000000001]
+2021-07-01 13:49:19.425 DEBUG 35136 --- [- timer://hello] o.a.c.c.l.LevelDBAggregationRepository   : Removing key [test]
+```
